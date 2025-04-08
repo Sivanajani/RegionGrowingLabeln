@@ -1,0 +1,113 @@
+import matplotlib.pyplot as plt
+import numpy as np
+from skimage.segmentation import flood
+
+
+def process_star_image(img_path) -> None:
+    """Verarbeitet ein Bild zur Erkennung und Visualisierung von Sternen (Blobs).
+
+    Diese Funktion führt folgende Schritte aus:
+      1. Liest das Bild ein und konvertiert es in ein Graustufenbild, indem der Durchschnitt der RGB-Kanäle berechnet wird.
+          Falls das Bild einen Alpha-Kanal enthält, wird dieser ignoriert.
+      2. Bestimmt einen Schwellenwert basierend auf dem Durchschnitt des Graustufenbildes, um ein binäres Bild zu erstellen,
+         das Sterne (helle Bereiche) vom Hintergrund (dunkle Bereiche) trennt.
+      3. Identifiziert zusammenhängende helle Bereiche (Sterne) mithilfe einer Flood-Fill-Methode und vergibt jedem Bereich
+         eine eindeutige Beschriftung.
+      4. Visualisiert die Ergebnisse:
+         - Eine interaktive Label Map, die jeden erkannten Stern in einer eindeutigen Farbe zeigt und bei einem Hover-Event
+           die ID des nächstgelegenen Sterns im Titel anzeigt.
+         - Binäre Segmentierungsmasken für jeden einzelnen Stern in Graustufen, die nacheinander in separaten Fenstern dargestellt werden.
+
+   Args:
+       img_path (str): Pfad zur Eingabebilddatei. Es wird ein RGB- oder RGBA-Bild mit Sternen erwartet.
+
+   Returns:
+       None: Die Funktion erzeugt mehrere Visualisierungen:
+           - Eine Label Map mit allen erkannten Sternen in verschiedenen Farben.
+           - Binäre Segmentierungsmasken für jeden Stern in Graustufen in separaten Fenstern.
+        Zusätzlich wird die Gesamtzahl der erkannten Sterne in der Konsole ausgegeben.
+
+   Visualisierungsdetails:
+       - Label Map: Zeigt alle erkannten Sterne mit eindeutigen Farben mithilfe der Farbkarte 'nipy_spectral'.
+       - Bei einem Hover-Event zeigt der Titel die ID des nächsten Sterns an.
+       - Segmentierungsmasken: Binäre Masken für jeden Stern in Graustufen, die einzeln in separaten Fenstern angezeigt werden.
+   """
+    
+    image = plt.imread(img_path)
+    image = np.sum(image[:, :, :3], axis=-1) / 3
+    threshold = np.mean(image)
+    binary = image > threshold
+    labeled_image = np.zeros_like(binary, dtype=int)
+    num_labels = 0
+    star_positions = []
+
+    for y in range(binary.shape[0]):
+        for x in range(binary.shape[1]):
+            if binary[y, x] and labeled_image[y, x] == 0:
+                num_labels += 1
+                flooded = flood(binary, (y, x), connectivity=2)
+                labeled_image[flooded] = num_labels
+                star_positions.append((x, y, num_labels))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(labeled_image, cmap='nipy_spectral', interpolation='nearest')
+    ax.set_title('Label Map')
+    fig.canvas.manager.set_window_title('Label Map')
+    ax.axis('on')
+
+    def on_hover(event):
+        """Reagiert auf das Hover-Event über der Label Map und zeigt die ID des nahegelegenen Sterns (Blob) im Titel an.
+
+        Diese Funktion wird aufgerufen, wenn sich die Maus innerhalb der Haupt-Label Map (`ax`) bewegt. Sie prüft, ob sich der Mauszeiger in der Nähe eines Sterns befindet, und führt dann folgende Schritte aus:
+            - Wenn sich die Maus innerhalb von 30 Pixeln von einem Stern (Blob) befindet:
+                1. Ändert den Titel der Achse, um die ID des Sterns anzuzeigen.
+                2. Setzt das Flag `hovered` auf `True`, um anzuzeigen, dass ein Stern in der Nähe ist.
+                3. Wenn kein Stern in der Nähe ist (d.h. `hovered` bleibt `False`), wird der Titel der Achse auf den Standardtext "Label Map" zurückgesetzt.
+
+        Die Funktion verwendet fig.canvas.draw_idle() für eine effiziente, reibungslose Aktualisierung der Titeländerungen, und
+         fig.canvas.draw() am Ende, um sicherzustellen, dass die Änderung des Titels unmittelbar angezeigt wird.
+
+        Hinweise zur Kompatibilität:
+        Für bessere plattformübergreifende Kompatibilität, einschliesslich iOS:
+            - Die Funktion verwendet `fig.canvas.draw_idle()` und `fig.canvas.draw()` für eine reibungslose Aktualisierung, da `draw_idle()` effizient arbeitet und besonders auf macOS und iOS stabilere Aktualisierungen gewährleistet.
+            - Auf eine manuelle Cursor-Anpassung (cursor='hand2') wurde verzichtet, um auf iOS-Systemen mögliche Darstellungsprobleme zu vermeiden.
+            Durch diese Anpassung wird die Funktion auf verschiedenen Plattformen, einschliesslich iOS, korrekt ausgeführt.
+
+        Args:
+            event: Das Hover-Event, das Informationen zur aktuellen Position der Maus und zur Achse enthält.
+
+        Rückgabe:
+            Keine explizite Rückgabe. Die Funktion aktualisiert den Titel der Achse dynamisch, wenn der Mauszeiger über einen Stern schwebt/hovert.
+        """
+        if event.inaxes == ax:
+            hovered = False
+            for (px, py, blob_label) in star_positions:
+                distance = np.sqrt((px - event.xdata) ** 2 + (py - event.ydata) ** 2)
+                if distance < 30:
+                    ax.set_title(f"Blob (Stern) {blob_label}")
+                    hovered = True
+                    break
+            if not hovered:
+                ax.set_title('Label Map')
+                fig.canvas.draw_idle()
+        fig.canvas.draw()
+
+    fig.canvas.mpl_connect('motion_notify_event', on_hover)
+    plt.tight_layout()
+    plt.show()
+
+    for label in range(1, num_labels + 1):
+        mask = np.equal(labeled_image, label)
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.imshow(mask, cmap='gray')
+        ax.set_title(f'Segmentierungsmaske von Blob {label}')
+        fig.canvas.manager.set_window_title(f'Figure {label}')
+        ax.axis('on')
+        plt.tight_layout()
+        plt.show()
+
+    print(f"Anzahl der detektierten Sterne: {num_labels}")
+
+
+image_path = 'stars.png'
+process_star_image(image_path)
