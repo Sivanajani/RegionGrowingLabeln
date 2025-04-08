@@ -44,10 +44,46 @@ Install with:
 ```bash
 pip install matplotlib numpy scikit-image
 ```
+---
+### 📸 Visual Overview
+
+#### 🖼️ Input: Original Star Image
+
+The script starts with this image of stars:
+
+![stars.png – Input](./stars.png)
 
 ---
 
-📄 License
+#### ⚫ Binary Segmentation (Thresholding Step)
+
+After grayscale conversion and thresholding, the image is binarized:  
+This mask (`segmentation_mask.png`) highlights bright areas that may contain stars.
+
+![segmentation_mask.png](./segmentation_mask.png)
+
+---
+
+#### 🌈 Labeled Output – Region Growing (Flood Fill)
+
+The Flood Fill algorithm assigns a unique label to each connected region.  
+This is visualized using a color-coded Label Map:
+
+![LabelMap.png](./LabelMap.png)
+
+---
+
+#### 🔎 Example: Binary Mask of a Single Star
+
+Each detected star (blob) is visualized in its own grayscale binary mask.
+
+Example – Blob 1:
+
+![Blob 1 – Binary Mask](./SegmentierungsmaskeBlob1.png)
+
+---
+
+## 📄 License
 This project was developed as part of a university project at FHNW and is intended for demonstration and educational purposes only.
 
 ---
